@@ -59,9 +59,15 @@
  * Matrix multiplication (CUDA Kernel) on the device: C = A * B
  * wA is A's width and wB is B's width
  */
+// 重点理解 shared memory tiling 的数据复用,
+// 以及两次同步分别保护 tile 的加载和下一轮覆盖. 旧笔记关联:
+// A, B, C 使用 row-major layout: element(row, col) 的 offset 为 row * width + col.
+// 一个 block 负责 C 的一个 BLOCK_SIZE x BLOCK_SIZE tile, 每个 thread 累加一个输出元素.
+// kernel 没有边界检查; 输入尺寸必须满足完整 tile 的要求.
 template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A, float *B, int wA, int wB)
 {
     // Block index
+    // 输出坐标: row = by * BLOCK_SIZE + ty, col = bx * BLOCK_SIZE + tx.
     int bx = blockIdx.x;
     int by = blockIdx.y;
 
@@ -70,6 +76,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A, floa
     int ty = threadIdx.y;
 
     // Index of the first sub-matrix of A processed by the block
+    // 固定 A 的 tile row, 沿 A 的列方向前进; 每次 a 增加 BLOCK_SIZE 个元素.
     int aBegin = wA * BLOCK_SIZE * by;
 
     // Index of the last sub-matrix of A processed by the block
@@ -79,6 +86,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A, floa
     int aStep = BLOCK_SIZE;
 
     // Index of the first sub-matrix of B processed by the block
+    // 固定 B 的 tile column, 沿 B 的行方向前进; 每次 b 增加 BLOCK_SIZE * wB 个元素.
     int bBegin = BLOCK_SIZE * bx;
 
     // Step size used to iterate through the sub-matrices of B
@@ -86,13 +94,17 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A, floa
 
     // Csub is used to store the element of the block sub-matrix
     // that is computed by the thread
+    // Csub 是每个 thread 私有的 accumulator, 跨所有 tile iteration 累加 dot product.
     float Csub = 0;
 
     // Loop over all the sub-matrices of A and B
     // required to compute the block sub-matrix
+    // 每轮计算公共维度 K 中的一个 tile; 默认 K=320, BLOCK_SIZE=32, 共迭代 10 次.
     for (int a = aBegin, b = bBegin; a <= aEnd; a += aStep, b += bStep) {
         // Declaration of the shared memory array As used to
         // store the sub-matrix of A
+        // 同一 block 的 threads 共享 As/Bs; 不同 block 拥有独立的 shared memory.
+        // BLOCK_SIZE=32 时两个 float tile 合计占 8 KiB, 每轮复用同一份空间.
         __shared__ float As[BLOCK_SIZE][BLOCK_SIZE];
 
         // Declaration of the shared memory array Bs used to
@@ -102,21 +114,26 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A, floa
         // Load the matrices from device memory
         // to shared memory; each thread loads
         // one element of each matrix
+        // 每个 thread 从 A/B 各加载一个元素, 全 block 合作填满两个 tile.
         As[ty][tx] = A[a + wA * ty + tx];
         Bs[ty][tx] = B[b + wB * ty + tx];
 
+        // 第一次 barrier: 等所有 thread 写完 As/Bs, 才允许其他 thread 读取这些值.
         // Synchronize to make sure the matrices are loaded
         __syncthreads();
 
         // Multiply the two matrices together;
         // each thread computes one element
         // of the block sub-matrix
+        // unroll 提示 compiler 展开固定次数的 k loop, 不会创建额外的 thread.
 #pragma unroll
 
         for (int k = 0; k < BLOCK_SIZE; ++k) {
+            // 使用 As 的第 ty 行和 Bs 的第 tx 列; tile 内每个输入元素可被多个 thread 复用.
             Csub += As[ty][k] * Bs[k][tx];
         }
 
+        // 第二次 barrier: 等所有 thread 读完当前 tile, 再允许下一轮覆盖 As/Bs.
         // Synchronize to make sure that the preceding
         // computation is done before loading two new
         // sub-matrices of A and B in the next iteration
@@ -125,6 +142,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A, floa
 
     // Write the block sub-matrix to device memory;
     // each thread writes one element
+    // c 是当前 C tile 左上角的 offset; 加上 thread 的 row/column offset 后写回一个结果.
     int c               = wB * BLOCK_SIZE * by + BLOCK_SIZE * bx;
     C[c + wB * ty + tx] = Csub;
 }
@@ -142,6 +160,7 @@ void ConstantInit(float *data, int size, float val)
 int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, const dim3 &dimsB)
 {
     // Allocate host memory for matrices A and B
+    // host array 使用 pinned memory, 配合下面同一 stream 内的 async copy.
     unsigned int size_A     = dimsA.x * dimsA.y;
     unsigned int mem_size_A = sizeof(float) * size_A;
     float       *h_A;
@@ -153,6 +172,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     cudaStream_t stream;
 
     // Initialize host memory
+    // A 全为 1, B 全为 0.01; 每个 C 元素的 reference 都是 K * 0.01.
     const float valB = 0.01f;
     ConstantInit(h_A, size_A, 1.0f);
     ConstantInit(h_B, size_B, valB);
@@ -161,6 +181,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     float *d_A, *d_B, *d_C;
 
     // Allocate host matrix C
+    // A 为 M x K, B 为 K x N, 则 C 为 M x N; dim3.x 存 column 数, dim3.y 存 row 数.
     dim3         dimsC(dimsB.x, dimsA.y, 1);
     unsigned int mem_size_C = dimsC.x * dimsC.y * sizeof(float);
     float       *h_C;
@@ -179,6 +200,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
 
+    // H2D, kernel 和 D2H 使用同一个 stream, 依靠 stream order 保证数据依赖.
     checkCudaErrors(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
 
     // copy host memory to device
@@ -186,12 +208,15 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     checkCudaErrors(cudaMemcpyAsync(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice, stream));
 
     // Setup execution parameters
+    // 默认 block=(32,32), 每个 block 1024 threads; grid=(20,10), 共 200 个 block.
+    // 这里用整除而非向上取整, M/N/K 均应为 block_size 的正整数倍.
     dim3 threads(block_size, block_size);
     dim3 grid(dimsB.x / threads.x, dimsA.y / threads.y);
 
     // Create and start timer
     printf("Computing result using CUDA Kernel...\n");
 
+    // warmup 不计入 event 区间; 后面的 stream synchronize 也等待前面的 H2D 完成.
     // Performs warmup operation using matrixMul CUDA kernel
     if (block_size == 16) {
         MatrixMulCUDA<16><<<grid, threads, 0, stream>>>(d_C, d_A, d_B, dimsA.x, dimsB.x);
@@ -203,10 +228,12 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     printf("done\n");
     checkCudaErrors(cudaStreamSynchronize(stream));
 
+    // start/stop 包围 300 次 kernel launch, 不包含 H2D/D2H; Debug build 的数值不用于性能结论.
     // Record the start event
     checkCudaErrors(cudaEventRecord(start, stream));
 
     // Execute the kernel
+    // GPU 重复执行 300 次, 用总耗时求单次平均值.
     int nIter = 300;
 
     for (int j = 0; j < nIter; j++) {
@@ -228,6 +255,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     checkCudaErrors(cudaEventElapsedTime(&msecTotal, start, stop));
 
     // Compute and print the performance
+    // 每个输出元素有 K 次 multiply-add, 按 2 FLOPs 计, 整次运算约为 2*M*N*K FLOPs.
     float  msecPerMatrixMul = msecTotal / nIter;
     double flopsPerMatrixMul =
         2.0 * static_cast<double>(dimsA.x) * static_cast<double>(dimsA.y) * static_cast<double>(dimsB.x);
@@ -240,6 +268,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
            threads.x * threads.y);
 
     // Copy result from device to host
+    // D2H 提交后还要等待 stream 完成, CPU 才能安全读取 h_C.
     checkCudaErrors(cudaMemcpyAsync(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost, stream));
     checkCudaErrors(cudaStreamSynchronize(stream));
 
@@ -250,6 +279,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA, con
     //     |<x, y>_cpu - <x,y>_gpu|/<|x|, |y|>  < eps
     double eps = 1.e-6; // machine zero
 
+    // 利用常量输入直接计算 reference; 此处 error 还除以 dot_length, 并非普通 relative error.
     for (int i = 0; i < static_cast<int>(dimsC.x * dimsC.y); i++) {
         double abs_err    = fabs(h_C[i] - (dimsA.x * valB));
         double dot_length = dimsA.x;
@@ -308,6 +338,8 @@ int main(int argc, char **argv)
 
     int block_size = 32;
 
+    // dim3.x 是列数(宽), dim3.y 是行数(高). 默认 block_size=32 时,
+    // 按"行 x 列"表示: A 为 320x320, B 为 320x640, C 为 320x640.
     dim3 dimsA(5 * 2 * block_size, 5 * 2 * block_size, 1);
     dim3 dimsB(5 * 4 * block_size, 5 * 2 * block_size, 1);
 
@@ -331,11 +363,14 @@ int main(int argc, char **argv)
         dimsB.y = getCmdLineArgumentInt(argc, (const char **)argv, "hB");
     }
 
+    // 检查公共维度 K: A 的 column 数必须等于 B 的 row 数.
+    // 当前代码没有检查 tile 对齐条件, 使用命令行尺寸时还需自行保证正数且为 32 的倍数.
     if (dimsA.x != dimsB.y) {
         printf("Error: outer matrix dimensions must be equal. (%d != %d)\n", dimsA.x, dimsB.y);
         exit(EXIT_FAILURE);
     }
 
+    // 这里输出的是(列数, 行数), 与通常的矩阵(行数, 列数)记法相反.
     printf("MatrixA(%d,%d), MatrixB(%d,%d)\n", dimsA.x, dimsA.y, dimsB.x, dimsB.y);
 
 #ifdef HAVE_CUDA_PROFILER_API

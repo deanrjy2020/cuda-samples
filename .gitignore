@@ -2,11 +2,14 @@ build
 build-*/
 test-results*/
 .vs
-.vscode
+/.vscode/*
 .clangd
+/compile_commands.json
 test
 settings.json
 launch.json
+!/.vscode/settings.json
+!/.vscode/launch.json
 __pycache__/
 *.py[co]
 .pytest_cache/

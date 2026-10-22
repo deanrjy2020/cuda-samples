@@ -1,0 +1,1179 @@
+commit 8efda95ad18c5e06f02665b03d8973f4b7d7ed00
+Author:     deanrjy2020 <renjiayuan1314@gmail.com>
+AuthorDate: Sat Jun 7 21:31:04 2025 -0700
+Commit:     deanrjy2020 <renjiayuan1314@gmail.com>
+CommitDate: Wed Jun 18 23:30:00 2025 -0700
+
+    dean commit
+
+diff --git a/0_Simple/asyncAPI/.vscode/c_cpp_properties.json b/0_Simple/asyncAPI/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/asyncAPI/.vscode/c_cpp_properties.json
++++ b/0_Simple/asyncAPI/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/asyncAPI/.vscode/settings.json b/0_Simple/asyncAPI/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/asyncAPI/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/asyncAPI/asyncAPI.cu b/0_Simple/asyncAPI/asyncAPI.cu
+index f2a642b..65b9900 100644
+--- a/0_Simple/asyncAPI/asyncAPI.cu
++++ b/0_Simple/asyncAPI/asyncAPI.cu
+@@ -91,9 +91,13 @@ int main(int argc, char *argv[])
+     checkCudaErrors(cudaDeviceSynchronize());
+     float gpu_time = 0.0f;
+ 
++    // 用CPU记录call时间和event记录gpu执行时间, 对比.
+     // asynchronously issue work to the GPU (all to stream 0)
+     sdkStartTimer(&timer);
+     cudaEventRecord(start, 0);
++    // cudaMemcpy 是同步内存拷贝，而 cudaMemcpyAsync 是异步内存拷贝。
++    // 简单来说，cudaMemcpy 会阻塞当前线程直到数据拷贝完成，而 cudaMemcpyAsync 不会阻塞，
++    // 允许程序在数据拷贝的同时继续执行其他任务。
+     cudaMemcpyAsync(d_a, a, nbytes, cudaMemcpyHostToDevice, 0);
+     increment_kernel<<<blocks, threads, 0, 0>>>(d_a, value);
+     cudaMemcpyAsync(a, d_a, nbytes, cudaMemcpyDeviceToHost, 0);
+diff --git a/0_Simple/asyncAPI/compile_commands.json b/0_Simple/asyncAPI/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/asyncAPI/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/cppIntegration/.vscode/c_cpp_properties.json b/0_Simple/cppIntegration/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/cppIntegration/.vscode/c_cpp_properties.json
++++ b/0_Simple/cppIntegration/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/cppIntegration/.vscode/settings.json b/0_Simple/cppIntegration/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/cppIntegration/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/cppIntegration/compile_commands.json b/0_Simple/cppIntegration/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/cppIntegration/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/cppIntegration/cppIntegration.cu b/0_Simple/cppIntegration/cppIntegration.cu
+index a3aa7d9..3eeaf9e 100644
+--- a/0_Simple/cppIntegration/cppIntegration.cu
++++ b/0_Simple/cppIntegration/cppIntegration.cu
+@@ -122,9 +122,13 @@ runTest(const int argc, const char **argv, char *data, int2 *data_int2, unsigned
+     dim3 threads(num_threads, 1, 1);
+     dim3 threads2(len, 1, 1); // more threads needed fir separate int2 version
+     // execute the kernel
++    // 4个thread, 每个thread处理4个char, 即一个int (按int读取)
+     kernel<<< grid, threads >>>((int *) d_data);
++    // 16个thread, 每个thread处理一个int2(=ivec2).
+     kernel2<<< grid, threads2 >>>(d_data_int2);
+ 
++    // 两个kernel里面做的事情都是每个char值-10
++
+     // check if kernel execution generated and error
+     getLastCudaError("Kernel execution failed");
+ 
+diff --git a/0_Simple/cppOverload/.vscode/c_cpp_properties.json b/0_Simple/cppOverload/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/cppOverload/.vscode/c_cpp_properties.json
++++ b/0_Simple/cppOverload/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/cppOverload/.vscode/settings.json b/0_Simple/cppOverload/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/cppOverload/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/cppOverload/Makefile b/0_Simple/cppOverload/Makefile
+index 6b85161..dcddda2 100644
+--- a/0_Simple/cppOverload/Makefile
++++ b/0_Simple/cppOverload/Makefile
+@@ -254,7 +254,7 @@ endif
+ 
+ # Debug build flags
+ ifeq ($(dbg),1)
+-      NVCCFLAGS += -g -G
++      NVCCFLAGS += -g -G --ptxas-options=-v
+       BUILD_TYPE := debug
+ else
+       BUILD_TYPE := release
+diff --git a/0_Simple/cppOverload/compile_commands.json b/0_Simple/cppOverload/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/cppOverload/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/cppOverload/cppOverload.cu b/0_Simple/cppOverload/cppOverload.cu
+index 35f8b8e..94b041a 100644
+--- a/0_Simple/cppOverload/cppOverload.cu
++++ b/0_Simple/cppOverload/cppOverload.cu
+@@ -128,9 +128,12 @@ int main(int argc, const char *argv[])
+     // overload function 1
+     func1 = simple_kernel;
+     memset(&attr, 0, sizeof(attr));
++    // prefer larger shared memory and smaller L1 cache
+     checkCudaErrors(cudaFuncSetCacheConfig(*func1, cudaFuncCachePreferShared));
++    // 核函数在编译的时候已经确定硬件资源的一些分配, 如shared mem size, register num, 都在attr里面.
+     checkCudaErrors(cudaFuncGetAttributes(&attr, *func1));
+     OUTPUT_ATTR(attr);
++    // 4个blocks, 每个256 threads
+     (*func1)<<<DIV_UP(N, THREAD_N), THREAD_N>>>(dInput, dOutput, a);
+     checkCudaErrors(cudaMemcpy(hOutput, dOutput, sizeof(int)*N, cudaMemcpyDeviceToHost));
+     funcResult = check_func1(hInput, hOutput, a);
+diff --git a/0_Simple/cppOverload/cppOverload_kernel.cuh b/0_Simple/cppOverload/cppOverload_kernel.cuh
+index 2055270..a0ad442 100644
+--- a/0_Simple/cppOverload/cppOverload_kernel.cuh
++++ b/0_Simple/cppOverload/cppOverload_kernel.cuh
+@@ -1,16 +1,20 @@
+ __global__ void simple_kernel(const int *pIn, int *pOut, int a)
+ {
++    // 一个block用了256*4=1024 Byte smem, 就是放256 int
+     __shared__ int sData[THREAD_N];
+     int tid = threadIdx.x + blockDim.x*blockIdx.x;
+ 
++    // 每个thread负责一个int, 从gmem copy到smem
+     sData[threadIdx.x] = pIn[tid];
+     __syncthreads();
+ 
++    // 随便处理一下, 写回gmem
+     pOut[tid] = sData[threadIdx.x]*a + tid;;
+ }
+ 
+ __global__ void simple_kernel(const int2 *pIn, int *pOut, int a)
+ {
++    // 256* 2 int * 4 Byte = 2048B
+     __shared__ int2 sData[THREAD_N];
+     int tid = threadIdx.x + blockDim.x*blockIdx.x;
+ 
+@@ -22,6 +26,7 @@ __global__ void simple_kernel(const int2 *pIn, int *pOut, int a)
+ 
+ __global__ void simple_kernel(const int *pIn1, const int *pIn2, int *pOut, int a)
+ {
++    // 1024B + 1024B
+     __shared__ int sData1[THREAD_N];
+     __shared__ int sData2[THREAD_N];
+     int tid = threadIdx.x + blockDim.x*blockIdx.x;
+diff --git a/0_Simple/matrixMul/.vscode/c_cpp_properties.json b/0_Simple/matrixMul/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/matrixMul/.vscode/c_cpp_properties.json
++++ b/0_Simple/matrixMul/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/matrixMul/.vscode/settings.json b/0_Simple/matrixMul/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/matrixMul/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/matrixMul/compile_commands.json b/0_Simple/matrixMul/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/matrixMul/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/matrixMul/matrixMul.cu b/0_Simple/matrixMul/matrixMul.cu
+index 859f621..2f0371e 100644
+--- a/0_Simple/matrixMul/matrixMul.cu
++++ b/0_Simple/matrixMul/matrixMul.cu
+@@ -38,6 +38,7 @@
+  * Matrix multiplication (CUDA Kernel) on the device: C = A * B
+  * wA is A's width and wB is B's width
+  */
++// 重点是理解smem在这里的作用, 完全理解, 见LearnAI/chapter2-cuda-programming/2.7-matmul-shared-memory
+ template <int BLOCK_SIZE>
+ __global__ void MatrixMulCUDA(float *C, float *A, float *B, int wA, int wB) {
+   // Block index
+@@ -190,6 +191,7 @@ int MatrixMultiply(int argc, char **argv, int block_size, const dim3 &dimsA,
+   // Execute the kernel
+   int nIter = 300;
+ 
++  // 这里用gpu做300次, 然后取平均.
+   for (int j = 0; j < nIter; j++) {
+     if (block_size == 16) {
+       MatrixMulCUDA<16>
+@@ -292,6 +294,7 @@ int main(int argc, char **argv) {
+ 
+   int block_size = 32;
+ 
++  // row col 表示: A 320x320, B 320x640, C 320x640
+   dim3 dimsA(5 * 2 * block_size, 5 * 2 * block_size, 1);
+   dim3 dimsB(5 * 4 * block_size, 5 * 2 * block_size, 1);
+ 
+@@ -321,6 +324,7 @@ int main(int argc, char **argv) {
+     exit(EXIT_FAILURE);
+   }
+ 
++  // 这里其实非常confuse, x为col, y为row
+   printf("MatrixA(%d,%d), MatrixB(%d,%d)\n", dimsA.x, dimsA.y, dimsB.x,
+          dimsB.y);
+ 
+diff --git a/0_Simple/matrixMulCUBLAS/.vscode/c_cpp_properties.json b/0_Simple/matrixMulCUBLAS/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/matrixMulCUBLAS/.vscode/c_cpp_properties.json
++++ b/0_Simple/matrixMulCUBLAS/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/matrixMulCUBLAS/.vscode/settings.json b/0_Simple/matrixMulCUBLAS/.vscode/settings.json
+new file mode 100644
+index 0000000..e7c05a0
+--- /dev/null
++++ b/0_Simple/matrixMulCUBLAS/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+\ No newline at end of file
+diff --git a/0_Simple/matrixMulCUBLAS/compile_commands.json b/0_Simple/matrixMulCUBLAS/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/matrixMulCUBLAS/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/matrixMulCUBLAS/matrixMulCUBLAS.cpp b/0_Simple/matrixMulCUBLAS/matrixMulCUBLAS.cpp
+index 132afd4..d76ed0b 100644
+--- a/0_Simple/matrixMulCUBLAS/matrixMulCUBLAS.cpp
++++ b/0_Simple/matrixMulCUBLAS/matrixMulCUBLAS.cpp
+@@ -48,6 +48,55 @@
+ // Piscataway, NJ: IEEE Press, 2008, pp. Art. 31:1-11.
+ //
+ 
++/*
++
++例子: C++ row-major的矩阵乘法, C = A * B
++A[2][3]=
++1,2,3
++4,5,6
++
++B[3][2]=
++1,2
++3,4
++5,6
++
++C[2][2]=
++22,28
++49,64
++
++上面是, 但是传入cublas后, 是按col-major,
++A变成了(还是C++ row-major的思想就变成下面这样, 事实上内存layout没有变化):
++1,4
++2,5
++3,6
++结果就不对了.
++
++解决方法:
++CT = BT * AT
++
++BT就是C++的row-major的B传进来, cublas按col-major相当于就是C++的BT
++(还是C++ row-major的思想)
++BT[2][3]=
++1,3,5
++2,4,6
++
++同理C++的A直接传进cublas变成的下面这样
++(还是C++ row-major的思想去解释, mem layout不会变)
++AT[3][2]=
++1,4
++2,5
++3,6
++
++cublas计算的结果:
++如果是row-major, 就是这样的:
++22,49
++28,64
++但是在cublas是col-major, 是这样的:
++22,28
++49,64
++C++拿过来就是C矩阵, 不用做任何改动.
++*/
++
+ // Utilities and system includes
+ #include <assert.h>
+ #include <helper_string.h>  // helper for shared functions common to CUDA Samples
+@@ -236,6 +285,7 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
+     checkCudaErrors(cudaMalloc((void **) &d_C, mem_size_C));
+ 
+     // setup execution parameters
++    // 10*20个block, 每个block 32*32=1024个thread
+     dim3 threads(block_size, block_size);
+     dim3 grid(matrix_size.uiWC / threads.x, matrix_size.uiHC / threads.y);
+ 
+diff --git a/0_Simple/simpleAssert/.vscode/c_cpp_properties.json b/0_Simple/simpleAssert/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/simpleAssert/.vscode/c_cpp_properties.json
++++ b/0_Simple/simpleAssert/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/simpleAssert/.vscode/settings.json b/0_Simple/simpleAssert/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/simpleAssert/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/simpleAssert/compile_commands.json b/0_Simple/simpleAssert/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/simpleAssert/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/simpleAssert/simpleAssert.cu b/0_Simple/simpleAssert/simpleAssert.cu
+index bf26786..b72082f 100644
+--- a/0_Simple/simpleAssert/simpleAssert.cu
++++ b/0_Simple/simpleAssert/simpleAssert.cu
+@@ -78,6 +78,10 @@ void runTest(int argc, char **argv)
+ 
+     printf("OS_System_Type.release = %s\n", OS_System_Type.release);
+ 
++    // print the rest of the OS_System_Type
++    printf("OS_System_Type.sysname = %s, OS_System_Type.nodename = %s, OS_System_Type.version = %s, OS_System_Type.machine = %s, OS_System_Type.domainname = %s\n",
++        OS_System_Type.sysname, OS_System_Type.nodename, OS_System_Type.version, OS_System_Type.machine, OS_System_Type.domainname);
++
+     if (!strcasecmp(OS_System_Type.sysname, "Darwin"))
+     {
+         printf("simpleAssert is not current supported on Mac OSX\n\n");
+@@ -95,6 +99,7 @@ void runTest(int argc, char **argv)
+ 
+     // Kernel configuration, where a one-dimensional
+     // grid and one-dimensional blocks are configured.
++    // 2个block, 每个32 thread
+     dim3 dimGrid(Nblocks);
+     dim3 dimBlock(Nthreads);
+ 
+diff --git a/0_Simple/simpleOccupancy/.vscode/c_cpp_properties.json b/0_Simple/simpleOccupancy/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/simpleOccupancy/.vscode/c_cpp_properties.json
++++ b/0_Simple/simpleOccupancy/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/simpleOccupancy/.vscode/settings.json b/0_Simple/simpleOccupancy/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/simpleOccupancy/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/simpleOccupancy/compile_commands.json b/0_Simple/simpleOccupancy/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/simpleOccupancy/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/simpleOccupancy/simpleOccupancy.cu b/0_Simple/simpleOccupancy/simpleOccupancy.cu
+index 1619783..bf1caaa 100644
+--- a/0_Simple/simpleOccupancy/simpleOccupancy.cu
++++ b/0_Simple/simpleOccupancy/simpleOccupancy.cu
+@@ -57,6 +57,7 @@ static double reportPotentialOccupancy(void *kernel, int blockSize, size_t dynam
+     checkCudaErrors(cudaGetDevice(&device));
+     checkCudaErrors(cudaGetDeviceProperties(&prop, device));
+ 
++    // 这个函数很有意思, 根据给定的核函数, block size和动态smem, 就能返回MaxActiveBlocksPerSM
+     checkCudaErrors(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+                         &numBlocks,
+                         kernel,
+@@ -66,6 +67,7 @@ static double reportPotentialOccupancy(void *kernel, int blockSize, size_t dynam
+     activeWarps = numBlocks * blockSize / prop.warpSize;
+     maxWarps = prop.maxThreadsPerMultiProcessor / prop.warpSize;
+ 
++    // 然后算得occupancy
+     occupancy = (double)activeWarps / maxWarps;
+ 
+     return occupancy;
+@@ -105,6 +107,7 @@ static int launchConfig(int *array, int arrayCount, bool automatic)
+     checkCudaErrors(cudaEventCreate(&end));
+ 
+     if (automatic) {
++        // 根据给定的核函数, 每个block要用的dyn shared mem等信息, 得到blockSize
+         checkCudaErrors(cudaOccupancyMaxPotentialBlockSize(
+                             &minGridSize,
+                             &blockSize,
+@@ -112,6 +115,7 @@ static int launchConfig(int *array, int arrayCount, bool automatic)
+                             dynamicSMemUsage,
+                             arrayCount));
+ 
++        // 推荐一个block有1024个thread, minGridSize做参考, gridSize 下面根据data算, 得到977 blocks
+         std::cout << "Suggested block size: " << blockSize << std::endl
+                   << "Minimum grid size for maximum occupancy: " << minGridSize << std::endl;
+     } else {
+@@ -120,6 +124,7 @@ static int launchConfig(int *array, int arrayCount, bool automatic)
+         // threads will be limited, and thus unable to achieve maximum
+         // occupancy.
+         //
++        // 共31250个block, 每个block 32个thread, 处理1M个int
+         blockSize = manualBlockSize;
+     }
+ 
+diff --git a/0_Simple/simplePrintf/.vscode/c_cpp_properties.json b/0_Simple/simplePrintf/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/simplePrintf/.vscode/c_cpp_properties.json
++++ b/0_Simple/simplePrintf/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/simplePrintf/.vscode/settings.json b/0_Simple/simplePrintf/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/simplePrintf/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/simplePrintf/compile_commands.json b/0_Simple/simplePrintf/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/simplePrintf/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/simplePrintf/simplePrintf.cu b/0_Simple/simplePrintf/simplePrintf.cu
+index a02371a..ac82092 100644
+--- a/0_Simple/simplePrintf/simplePrintf.cu
++++ b/0_Simple/simplePrintf/simplePrintf.cu
+@@ -25,6 +25,8 @@
+ #define MAX(a,b) (a > b ? a : b)
+ #endif
+ 
++// 第一个值是在grid里面一维的block id, 范围[0, 3]
++// 第二个值是在每个block里面一维的thread id, 范围[0, 7]
+ __global__ void testKernel(int val)
+ {
+     printf("[%d, %d]:\t\tValue is:%d\n",\
+@@ -51,6 +53,7 @@ int main(int argc, char **argv)
+ 
+     //Kernel configuration, where a two-dimensional grid and
+     //three-dimensional blocks are configured.
++    // 4个blocks, 每个block里面有8个threads
+     dim3 dimGrid(2, 2);
+     dim3 dimBlock(2, 2, 2);
+     testKernel<<<dimGrid, dimBlock>>>(10);
+diff --git a/0_Simple/simpleStreams/.vscode/c_cpp_properties.json b/0_Simple/simpleStreams/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/simpleStreams/.vscode/c_cpp_properties.json
++++ b/0_Simple/simpleStreams/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/simpleStreams/.vscode/settings.json b/0_Simple/simpleStreams/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/simpleStreams/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/simpleStreams/compile_commands.json b/0_Simple/simpleStreams/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/simpleStreams/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/simpleStreams/simpleStreams.cu b/0_Simple/simpleStreams/simpleStreams.cu
+index 306a8e2..e6eae93 100644
+--- a/0_Simple/simpleStreams/simpleStreams.cu
++++ b/0_Simple/simpleStreams/simpleStreams.cu
+@@ -31,13 +31,14 @@
+ 
+ const char *sSDKsample = "simpleStreams";
+ 
+-const char *sEventSyncMethod[] =
+-{
+-    "cudaEventDefault",
+-    "cudaEventBlockingSync",
+-    "cudaEventDisableTiming",
+-    NULL
+-};
++// 这个没用.
++// const char *sEventSyncMethod[] =
++// {
++//     "cudaEventDefault",
++//     "cudaEventBlockingSync",
++//     "cudaEventDisableTiming",
++//     NULL
++// };
+ 
+ const char *sDeviceSyncMethod[] =
+ {
+@@ -329,6 +330,10 @@ int main(int argc, char **argv)
+     checkCudaErrors(cudaEventCreateWithFlags(&stop_event, eventflags));
+ 
+     // time memcopy from device
++    // 默认的stream0和其他stream都是隐式同步, 具体见cuda page隐式同步.
++    // CUDA 保证：任意非默认 stream 的操作会等待默认 stream 的命令完成之后再执行，反之亦然
++    // 所以这里在stream0上记录时间, 在streams[0]上操作是可以的.
++    // 第一个时间试单单把16M个int从dev mem copy到host mem的时间.
+     checkCudaErrors(cudaEventRecord(start_event, 0));     // record in stream-0, to ensure that all previous CUDA calls have completed
+     checkCudaErrors(cudaMemcpyAsync(hAligned_a, d_a, nbytes, cudaMemcpyDeviceToHost, streams[0]));
+     checkCudaErrors(cudaEventRecord(stop_event, 0));
+@@ -337,6 +342,8 @@ int main(int argc, char **argv)
+     printf("memcopy:\t%.2f\n", time_memcpy);
+ 
+     // time kernel
++    // 32768=32k个block, 每个512 thread
++    // 第二个时间是单单做kernel的时间.
+     threads=dim3(512, 1);
+     blocks=dim3(n / threads.x, 1);
+     checkCudaErrors(cudaEventRecord(start_event, 0));
+@@ -348,6 +355,8 @@ int main(int argc, char **argv)
+ 
+     //////////////////////////////////////////////////////////////////////
+     // time non-streamed execution for reference
++    // 同样的32k个block, 每个512 thread
++    // kernel+memcpy的时间, 做10次求平均
+     threads=dim3(512, 1);
+     blocks=dim3(n / threads.x, 1);
+     checkCudaErrors(cudaEventRecord(start_event, 0));
+@@ -365,6 +374,8 @@ int main(int argc, char **argv)
+ 
+     //////////////////////////////////////////////////////////////////////
+     // time execution with nstreams streams
++    // 每个stream里面8192个block, 每个512个thread, 处理4M个int
++    // 一共4个stream处理16M个int
+     threads=dim3(512,1);
+     blocks=dim3(n/(nstreams*threads.x),1);
+     memset(hAligned_a, 255, nbytes);     // set host memory bits to all 1s, for testing correctness
+diff --git a/0_Simple/simpleZeroCopy/.vscode/c_cpp_properties.json b/0_Simple/simpleZeroCopy/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/simpleZeroCopy/.vscode/c_cpp_properties.json
++++ b/0_Simple/simpleZeroCopy/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/simpleZeroCopy/.vscode/settings.json b/0_Simple/simpleZeroCopy/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/simpleZeroCopy/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/simpleZeroCopy/compile_commands.json b/0_Simple/simpleZeroCopy/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/simpleZeroCopy/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/0_Simple/simpleZeroCopy/simpleZeroCopy.cu b/0_Simple/simpleZeroCopy/simpleZeroCopy.cu
+index 25433e3..d515cdc 100644
+--- a/0_Simple/simpleZeroCopy/simpleZeroCopy.cu
++++ b/0_Simple/simpleZeroCopy/simpleZeroCopy.cu
+@@ -143,8 +143,29 @@ int main(int argc, char **argv)
+     nelem = 1048576;
+     bytes = nelem*sizeof(float);
+ 
++    /* dean:
++    | 对比项             | malloc + cudaHostRegisterMapped        | cudaHostAllocMapped        |
++    | ------------------ | -------------------------------------- | -------------------------- |
++    | 内存分配方式        | 手动 malloc                            | CUDA 自动分配 pinned memory |
++    | 是否锁页（Pinned）  | 是（通过 Register 实现）                | 是（由 HostAlloc 默认保证）  |
++    | 是否可映射给 device | 是（使用 `cudaHostRegisterMapped`）     | 是（由 flag 指定）          |
++    | 是否必须对齐        | ✅ 是（需要手动对齐，尤其 > 4K 时）      | ❌ 不用，CUDA 内部已处理    |
++    | 是否更灵活          | ✅ 更灵活（可管理原始指针）             | 相对简单但较黑箱             |
++    | 推荐平台            | 嵌入式/性能敏感场景（如 Jetson）         | 通用主机平台                |
++    | 清理内存            | 需调用 `cudaHostUnregister` + `free`   | 只需 `cudaFreeHost`         |
++
++    在 Jetson AGX Xavier 上的推荐
++    因为 Jetson 是 SoC 架构，共享物理内存，因此 Zero-Copy 效果很好。
++    malloc + cudaHostRegisterMapped 和 cudaHostAllocMapped 都是在 Host memory（CPU DRAM） 上分配。
++    ✅ Jetson 是 CPU/GPU 共用 DRAM，不像 PC dGPU 要跨 PCIe。
++    ✅ GPU 通过 IOMMU 可以直接访问这块 Host Memory（Zero-Copy）。
++    建议优先使用 cudaHostAllocMapped, 更方便，除非：
++        需要手动控制对齐（如 tensor 要求 4K 对齐），
++        或已有现成 malloc 指针需要注册成 pinned.
++     */
+     if (bPinGenericMemory)
+     {
++        // dean: 手动 malloc，然后注册为 pinned+mapped
+ #if CUDART_VERSION >= 4000
+         a_UA = (float *) malloc(bytes + MEMORY_ALIGNMENT);
+         b_UA = (float *) malloc(bytes + MEMORY_ALIGNMENT);
+@@ -162,6 +183,7 @@ int main(int argc, char **argv)
+     }
+     else
+     {
++        // dean: 直接调用 cudaHostAlloc 分配 pinned+mapped 内存
+ #if CUDART_VERSION >= 2020
+         flags = cudaHostAllocMapped;
+         checkCudaErrors(cudaHostAlloc((void **)&a, bytes, flags));
+@@ -189,6 +211,7 @@ int main(int argc, char **argv)
+ 
+     /* Call the GPU kernel using the CPU pointers residing in CPU mapped memory. */
+     printf("> vectorAddGPU kernel will add vectors using mapped CPU memory...\n");
++    // 4096个block, 每个block 256个thread
+     dim3 block(256);
+     dim3 grid((unsigned int)ceil(nelem/(float)block.x));
+     vectorAddGPU<<<grid, block>>>(d_a, d_b, d_c, nelem);
+diff --git a/0_Simple/vectorAdd/.vscode/c_cpp_properties.json b/0_Simple/vectorAdd/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/0_Simple/vectorAdd/.vscode/c_cpp_properties.json
++++ b/0_Simple/vectorAdd/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/0_Simple/vectorAdd/.vscode/settings.json b/0_Simple/vectorAdd/.vscode/settings.json
+new file mode 100644
+index 0000000..cee2683
+--- /dev/null
++++ b/0_Simple/vectorAdd/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+diff --git a/0_Simple/vectorAdd/compile_commands.json b/0_Simple/vectorAdd/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/0_Simple/vectorAdd/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/1_Utilities/bandwidthTest/.vscode/c_cpp_properties.json b/1_Utilities/bandwidthTest/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/1_Utilities/bandwidthTest/.vscode/c_cpp_properties.json
++++ b/1_Utilities/bandwidthTest/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/1_Utilities/bandwidthTest/.vscode/settings.json b/1_Utilities/bandwidthTest/.vscode/settings.json
+new file mode 100644
+index 0000000..e7c05a0
+--- /dev/null
++++ b/1_Utilities/bandwidthTest/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+\ No newline at end of file
+diff --git a/1_Utilities/bandwidthTest/compile_commands.json b/1_Utilities/bandwidthTest/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/1_Utilities/bandwidthTest/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/1_Utilities/deviceQuery/.vscode/c_cpp_properties.json b/1_Utilities/deviceQuery/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/1_Utilities/deviceQuery/.vscode/c_cpp_properties.json
++++ b/1_Utilities/deviceQuery/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/1_Utilities/deviceQuery/compile_commands.json b/1_Utilities/deviceQuery/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/1_Utilities/deviceQuery/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/1_Utilities/deviceQuery/deviceQuery.cpp b/1_Utilities/deviceQuery/deviceQuery.cpp
+index 3ea88b0..a4797ca 100644
+--- a/1_Utilities/deviceQuery/deviceQuery.cpp
++++ b/1_Utilities/deviceQuery/deviceQuery.cpp
+@@ -92,6 +92,7 @@ int main(int argc, char **argv) {
+     printf("  CUDA Capability Major/Minor version number:    %d.%d\n",
+            deviceProp.major, deviceProp.minor);
+ 
++    // dean: global mem就是vmem
+     char msg[256];
+ #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
+     sprintf_s(msg, sizeof(msg),
+@@ -108,6 +109,7 @@ int main(int argc, char **argv) {
+ #endif
+     printf("%s", msg);
+ 
++    // dean: 这里的Multiprocessors就是SM(Streaming Multiprocessors).
+     printf("  (%03d) Multiprocessors, (%03d) CUDA Cores/MP:    %d CUDA Cores\n",
+            deviceProp.multiProcessorCount,
+            _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor),
+@@ -176,10 +178,14 @@ int main(int argc, char **argv) {
+            deviceProp.sharedMemPerMultiprocessor);
+     printf("  Total number of registers available per block: %d\n",
+            deviceProp.regsPerBlock);
++    printf("  Total number of registers available per sm:    %d\n",
++           deviceProp.regsPerMultiprocessor);
+     printf("  Warp size:                                     %d\n",
+            deviceProp.warpSize);
+     printf("  Maximum number of threads per multiprocessor:  %d\n",
+            deviceProp.maxThreadsPerMultiProcessor);
++    printf("  Maximum number of blocks per multiprocessor:   %d\n",
++           deviceProp.maxBlocksPerMultiProcessor);
+     printf("  Maximum number of threads per block:           %d\n",
+            deviceProp.maxThreadsPerBlock);
+     printf("  Max dimension size of a thread block (x,y,z): (%d, %d, %d)\n",
+@@ -323,3 +329,56 @@ int main(int argc, char **argv) {
+   // finish
+   exit(EXIT_SUCCESS);
+ }
++
++/*
++
++./deviceQuery Starting...
++
++ CUDA Device Query (Runtime API) version (CUDART static linking)
++
++Detected 1 CUDA Capable device(s)
++
++Device 0: "Xavier"
++  CUDA Driver Version / Runtime Version          11.4 / 11.4
++  CUDA Capability Major/Minor version number:    7.2
++  Total amount of global memory:                 30991 MBytes (32496091136 bytes)
++  (008) Multiprocessors, (064) CUDA Cores/MP:    512 CUDA Cores
++  GPU Max Clock rate:                            1377 MHz (1.38 GHz)
++  Memory Clock rate:                             675 Mhz
++  Memory Bus Width:                              256-bit
++  L2 Cache Size:                                 524288 bytes
++  Maximum Texture Dimension Size (x,y,z)         1D=(131072), 2D=(131072, 65536), 3D=(16384, 16384, 16384)
++  Maximum Layered 1D Texture Size, (num) layers  1D=(32768), 2048 layers
++  Maximum Layered 2D Texture Size, (num) layers  2D=(32768, 32768), 2048 layers
++  Total amount of constant memory:               65536 bytes
++  Total amount of shared memory per block:       49152 bytes
++  Total shared memory per multiprocessor:        98304 bytes
++  Total number of registers available per block: 65536
++  Total number of registers available per sm:    65536
++  Warp size:                                     32
++  Maximum number of threads per multiprocessor:  2048
++  Maximum number of blocks per multiprocessor:   32
++  Maximum number of threads per block:           1024
++  Max dimension size of a thread block (x,y,z): (1024, 1024, 64)
++  Max dimension size of a grid size    (x,y,z): (2147483647, 65535, 65535)
++  Maximum memory pitch:                          2147483647 bytes
++  Texture alignment:                             512 bytes
++  Concurrent copy and kernel execution:          Yes with 1 copy engine(s)
++  Run time limit on kernels:                     No
++  Integrated GPU sharing Host Memory:            Yes
++  Support host page-locked memory mapping:       Yes
++  Alignment requirement for Surfaces:            Yes
++  Device has ECC support:                        Disabled
++  Device supports Unified Addressing (UVA):      Yes
++  Device supports Managed Memory:                Yes
++  Device supports Compute Preemption:            Yes
++  Supports Cooperative Kernel Launch:            Yes
++  Supports MultiDevice Co-op Kernel Launch:      Yes
++  Device PCI Domain ID / Bus ID / location ID:   0 / 0 / 0
++  Compute Mode:
++     < Default (multiple host threads can use ::cudaSetDevice() with device simultaneously) >
++
++deviceQuery, CUDA Driver = CUDART, CUDA Driver Version = 11.4, CUDA Runtime Version = 11.4, NumDevs = 1
++Result = PASS
++
++*/
+\ No newline at end of file
+diff --git a/6_Advanced/concurrentKernels/.vscode/c_cpp_properties.json b/6_Advanced/concurrentKernels/.vscode/c_cpp_properties.json
+index c788368..fb6beee 100644
+--- a/6_Advanced/concurrentKernels/.vscode/c_cpp_properties.json
++++ b/6_Advanced/concurrentKernels/.vscode/c_cpp_properties.json
+@@ -11,7 +11,8 @@
+             "cStandard": "gnu17",
+             "cppStandard": "gnu++14",
+             "intelliSenseMode": "linux-gcc-x64",
+-            "configurationProvider": "ms-vscode.makefile-tools"
++            "configurationProvider": "ms-vscode.makefile-tools",
++            "compileCommands": "${workspaceFolder}/compile_commands.json"
+         }
+     ],
+     "version": 4
+diff --git a/6_Advanced/concurrentKernels/.vscode/settings.json b/6_Advanced/concurrentKernels/.vscode/settings.json
+new file mode 100644
+index 0000000..e7c05a0
+--- /dev/null
++++ b/6_Advanced/concurrentKernels/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "*.cu": "cuda-cpp"
++    }
++}
+\ No newline at end of file
+diff --git a/6_Advanced/concurrentKernels/compile_commands.json b/6_Advanced/concurrentKernels/compile_commands.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/6_Advanced/concurrentKernels/compile_commands.json
+@@ -0,0 +1 @@
++[]
+diff --git a/6_Advanced/concurrentKernels/concurrentKernels.cu b/6_Advanced/concurrentKernels/concurrentKernels.cu
+index 7039c7f..0774e7f 100644
+--- a/6_Advanced/concurrentKernels/concurrentKernels.cu
++++ b/6_Advanced/concurrentKernels/concurrentKernels.cu
+@@ -31,6 +31,8 @@ __global__ void clock_block(clock_t *d_o, clock_t clock_count) {
+ 
+   clock_t clock_offset = 0;
+ 
++  // 运行够clock_count个时钟周期, 即这么多ticks就可以退出了.
++  // 核函数的output就是把这个clock_offset (应该略大于clock_count)输出
+   while (clock_offset < clock_count) {
+     unsigned int end_clock = (unsigned int)clock();
+ 
+@@ -51,28 +53,52 @@ __global__ void clock_block(clock_t *d_o, clock_t clock_count) {
+ }
+ 
+ // Single warp reduction kernel
++// N=8, d_clocks就是一个长度为8个array, 放着8个clocks, 即前面8个kernel的执行时间, 单位tick
++// 把这些时间加总起来，写回 d_clocks[0]
+ __global__ void sum(clock_t *d_clocks, int N) {
+   // Handle to thread block group
+   cg::thread_block cta = cg::this_thread_block();
++  // 分配了一个大小为 32 的共享内存数组，用于归约中间结果
++  // 这里假设最多只有 32 个线程（即一个 warp），因为这个是 single-warp reduction
+   __shared__ clock_t s_clocks[32];
+ 
+   clock_t my_sum = 0;
+ 
++  // thread 0 处理 i=0, i=32, i=64
++  // N=8, 只有thread 0~7在工作, 从global mem读入, 写到自己的register my_sum里面(单单copy).
++  // 其他thread无用(对应的my_sum=0).
+   for (int i = threadIdx.x; i < N; i += blockDim.x) {
+     my_sum += d_clocks[i];
+   }
+ 
++  // 每个thread把自己的my_sum写到对应的smem位置.
+   s_clocks[threadIdx.x] = my_sum;
++  // 等待所有线程完成写入
+   cg::sync(cta);
+ 
++  // 归约（Reduction）逻辑
++  // 在smem里面完成规约.
++  // 对0~31共32个thread, i=16, 8, 4, 2, 1
+   for (int i = 16; i > 0; i /= 2) {
++    // i=16, 0~15号thread才能进来, 16~31号thread跳过.
+     if (threadIdx.x < i) {
++      // 0~15号thread的i=16 (第一次loop), 把smem的后半部分加到前半部分.
+       s_clocks[threadIdx.x] += s_clocks[threadIdx.x + i];
+     }
+ 
++    // 每次都是32个thread都做完了在进行下一次loop
+     cg::sync(cta);
++
++    // loop2, i=8, 32个thread都有这个loop, 但是只有0~7号thread才能进if
++    //    进去后把4~7号的4个加到0~3上来
++    // loop3, i=4, 32个thread都有这个loop, 但是只有0~3号thread才能进if
++    //    进去后把2~3号的2个加到0~1上来
++    // loop4, i=2, 32个thread都有这个loop, 但是只有0~1号thread才能进if
++    //    进去后把1号的1个加到0上来
++    // 最终32个smem里面的累加在s_clock[0]上
+   }
+ 
++  // 从smem写回gmem
+   d_clocks[0] = s_clocks[0];
+ }
+ 
+@@ -80,6 +106,7 @@ int main(int argc, char **argv) {
+   int nkernels = 8;             // number of concurrent kernels
+   int nstreams = nkernels + 1;  // use one more stream than concurrent kernel
+   int nbytes = nkernels * sizeof(clock_t);  // number of data bytes
++  // 让每个kernel跑10ms
+   float kernel_time = 10;                   // time the kernel should run in ms
+   float elapsed_time;                       // timing variables
+   int cuda_device = 0;
+@@ -126,6 +153,7 @@ int main(int argc, char **argv) {
+   }
+ 
+   // create CUDA event handles
++  // 用来测量总的 GPU 执行时间, 被记录在stream 0上
+   cudaEvent_t start_event, stop_event;
+   checkCudaErrors(cudaEventCreate(&start_event));
+   checkCudaErrors(cudaEventCreate(&stop_event));
+@@ -133,9 +161,11 @@ int main(int argc, char **argv) {
+   // the events are used for synchronization only and hence do not need to
+   // record timings this also makes events not introduce global sync points when
+   // recorded which is critical to get overlap
++  // 8个kernel对应8个event
+   cudaEvent_t *kernelEvent;
+   kernelEvent = (cudaEvent_t *)malloc(nkernels * sizeof(cudaEvent_t));
+ 
++  // 使用 cudaEventDisableTiming 表示这些事件只是用于同步，不记录时间（避免引入隐式同步，影响并发性）
+   for (int i = 0; i < nkernels; i++) {
+     checkCudaErrors(
+         cudaEventCreateWithFlags(&(kernelEvent[i]), cudaEventDisableTiming));
+@@ -143,11 +173,18 @@ int main(int argc, char **argv) {
+ 
+   //////////////////////////////////////////////////////////////////////
+   // time execution with nkernels streams
++  // kernel_time 是期望 kernel 运行的毫秒数, 10ms
++  // deviceProp.clockRate 是 GPU 的时钟频率（单位 kHz）, 即1377000 kHZ, 是每秒有多少个时钟周期,
++  // 即1377000000 ticks/s
++  // 两个相乘表示运行10ms需要的ticks个数 = 10ms * 1/1000 * 1377000000 = 10 * 1377000 = 13770000 ticks
++  // 这个就是核函数里面的time_count.
+   clock_t total_clocks = 0;
+ #if defined(__arm__) || defined(__aarch64__)
+   // the kernel takes more time than the channel reset time on arm archs, so to
+   // prevent hangs reduce time_clocks.
+-  clock_t time_clocks = (clock_t)(kernel_time * (deviceProp.clockRate / 100));
++  // 这里arm架构改成和x86架构一样, 因为后面的打印信息没考虑到这个100.
++  //clock_t time_clocks = (clock_t)(kernel_time * (deviceProp.clockRate / 100));
++  clock_t time_clocks = (clock_t)(kernel_time * deviceProp.clockRate);
+ #else
+   clock_t time_clocks = (clock_t)(kernel_time * deviceProp.clockRate);
+ #endif
+@@ -156,11 +193,15 @@ int main(int argc, char **argv) {
+ 
+   // queue nkernels in separate streams and record when they are done
+   for (int i = 0; i < nkernels; ++i) {
++    // 8个核函数在8个stream上跑, 并行, 一个kernel只有一个thread
+     clock_block<<<1, 1, 0, streams[i]>>>(&d_a[i], time_clocks);
+     total_clocks += time_clocks;
++    // 在每个核函数后面都放一个event
+     checkCudaErrors(cudaEventRecord(kernelEvent[i], streams[i]));
+ 
+     // make the last stream wait for the kernel event to be recorded
++    // stream 9个, 0~8, kernel 8个, 0~7
++    // 最后一个stream (stream 8)等着前面0~7个kernel, 它会等待所有 kernel 执行完再继续执行汇总操作
+     checkCudaErrors(
+         cudaStreamWaitEvent(streams[nstreams - 1], kernelEvent[i], 0));
+   }
+@@ -168,6 +209,9 @@ int main(int argc, char **argv) {
+   // queue a sum kernel and a copy back to host in the last stream.
+   // the commands in this stream get dispatched as soon as all the kernel events
+   // have been recorded
++  // 32个thread, sum kernel 负责汇总多个 d_a[i] 的数据, 然后用异步拷贝从 device 到 host.
++  // 两个操作都在 streams 8上执行，而这个 stream 8 又等待了所有 kernel event，
++  // 因此它们会在所有 kernel 执行完之后才开始.
+   sum<<<1, 32, 0, streams[nstreams - 1]>>>(d_a, nkernels);
+   checkCudaErrors(cudaMemcpyAsync(
+       a, d_a, sizeof(clock_t), cudaMemcpyDeviceToHost, streams[nstreams - 1]));
+@@ -180,13 +224,17 @@ int main(int argc, char **argv) {
+   checkCudaErrors(cudaEventSynchronize(stop_event));
+   checkCudaErrors(cudaEventElapsedTime(&elapsed_time, start_event, stop_event));
+ 
++  // expected 信息, 每个kernel跑10ms, 共8个, 80ms=0.08s
+   printf("Expected time for serial execution of %d kernels = %.3fs\n", nkernels,
+          nkernels * kernel_time / 1000.0f);
++  // 理论完全并行, 8个和1个时间一样, 0.01s
+   printf("Expected time for concurrent execution of %d kernels = %.3fs\n",
+          nkernels, kernel_time / 1000.0f);
+   printf("Measured time for sample = %.3fs\n", elapsed_time / 1000.0f);
+ 
+   bool bTestResult = (a[0] > total_clocks);
++  printf("Measured tick = %d, total_clocks = %d\n",
++    (unsigned int) a[0], (unsigned int)total_clocks);
+ 
+   // release resources
+   for (int i = 0; i < nkernels; i++) {
+@@ -210,3 +258,17 @@ int main(int argc, char **argv) {
+   printf("Test passed\n");
+   exit(EXIT_SUCCESS);
+ }
++
++/*
++
++[./concurrentKernels] - Starting...
++GPU Device 0: "Xavier" with compute capability 7.2
++
++> Detected Compute SM 7.2 hardware with 8 multi-processors
++Expected time for serial execution of 8 kernels = 0.080s
++Expected time for concurrent execution of 8 kernels = 0.010s
++Measured time for sample = 0.022s
++Measured tick = 110160137, total_clocks = 110160000
++Test passed
++
++*/
+\ No newline at end of file
+diff --git a/README.md b/README.md
+index 4e93bb8..5907173 100644
+--- a/README.md
++++ b/README.md
+@@ -1,4 +1,46 @@
+-# LearnCudaSamples
+-
+-Copied from /usr/local/cuda/samples/ on Jetson AGX Xavier with JetPack 5.1.5.
+-Cuda version 11.4.19
+\ No newline at end of file
++# LearnCudaSamples
++
++Copied from /usr/local/cuda/samples/ on Jetson AGX Xavier with JetPack 5.1.5. Cuda version 11.4.19
++
++最新的版本在这里: https://github.com/NVIDIA/cuda-samples/tree/master
++
++make dbg=1 SMS=72
++make clean dbg=1 SMS=72
++
++Done with:
++- 0_Simple
++    - asyncAPI
++        - (H2D async, kernel, D2H async), 用CPU记录时间和event记录GPU执行时间, 对比.
++    - cppIntegration
++        - C++ 包裹 CUDA 的简单封装，适合 plugin 或工程模块化使用。看看结构，了解怎么组织 .cu/.cpp 混编，不必深挖
++    - cppOverload
++        - cudaFuncGetAttributes(&attr, *func1);得到核函数编译后的信息, 如shared mem size, register num
++        - 上面的是runtime时候知道, 如果在flags里面加--resource-usage或者--ptxas-options=-v, nvcc编译时候就能知道.
++    - matrixMul
++        - 核心：tile-based shared memory 实现 GEMM，是推理核心操作。重点掌握：BLOCKSIZE, shared memory tiling, loop unrolling, bank conflict 避免，和自己代码对比写一版.
++        - port 到LearnAI/chapter2-cuda-programming/2.7-matmul-shared-memory with more comments.
++    - matrixMulCUBLAS
++        - 调用cublasSgemm做矩阵乘法,而不是自己写kernel函数. cublas是col-major, C++里面C=A*B要按照B*A传进去, 不用做任何转置. 具体见代码里面的comments.
++    - simpleAssert
++        - 可以在核函数里面用assert, 了解即可，可用在 debug 推理 kernel 的中间状态检查
++        - C++里面也有对应的shell的uname函数, 得到系统的信息.
++    - simpleOccupancy
++        - 由cudaOccupancyMaxPotentialBlockSize()推荐block size, 然后用cudaOccupancyMaxActiveBlocksPerMultiprocessor()算得occupancy. 重点理解 occupancy 概念 + 用这个 API 做参数 sweep 自动调优. 见cuda hw page warp部分.
++    - simplePrintf
++        - 核函数内 printf
++    - simpleStreams
++        - 单单memcopy时间7.89, 单单跑kernel时间10.29, 合在一起做10次求平均时间9.07, 分成4个stream并行处理时间5.33
++    - simpleZeroCopy
++        - 展示两种mapped内存分配方式, 1, 普通malloc, 然后cudaHostRegisterMapped注册实现map, 2, 用cudaHostAllocMapped实现map, 都是CPU端分配mem, 然后map后GPU可以直接用, 不用memcpy. 更多见cuda mem page.
++    - vectorAdd
++        - 非常简单的H2D, C=A+B, D2H
++- 1_Utilities
++    - deviceQuery
++    - bandwidthTest
++        - 就是测试H2D/D2H/D2D的速度. H2D 19.0 GB/s, D2H 19.0 GB/s, D2D 62.5 GB/s
++        - Jetson AGX Xavier 使用统一内存（Unified Memory Architecture, UMA），意味着 CPU 和 GPU 都访问同一个 DRAM。这种设计避免了 discrete GPU 上 PCIe 复制的瓶颈. 但是"统一物理内存" ≠ "相同的访问效率". CPU 和 GPU 是通过不同的路径访问 DRAM, CPU 走 内存控制器(via ARM coherent interconnect, e.g., CCI/CCI-N), GPU 走 GPU DRAM interface（高带宽 memory controller, 可支持 HBM/LPDDR）. H2D/D2H是由 CPU 发起 copy 行为，DMA 机制或 CPU mem copy 都有限制在带宽和执行模型上. D2D是 在 GPU 上由 CUDA runtime 发起的 copy 操作，直接走 GPU 的内部 memory controller，属于最快路径.
++- 6_Advanced
++    - concurrentKernels
++        - 8个kernel在8个stream上并发, 全部执行完后, 用一个sum核函数规约, 把前面8个执行的output (ticks)累加起来.
++    - reduction
++        - todo, next

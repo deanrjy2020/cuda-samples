@@ -49,14 +49,19 @@
 // CUDA runtime
 #include <cuda_runtime.h>
 
+// 当前配置: N=16777216, 一个array里面N个float, array占 64 MB, 共2个array
 #define N (1 << 24) // ~16M elements
 #define BLOCK 256   // threads per block
 #define NUM_STREAMS 4   // number of concurrent streams
 
 // Kernel: computes element-wise square of the input array
+// grid和block都是一维的.
 __global__ void square_kernel(const float* in, float* out, int n){
+    // idx 是本次 kernel 输入范围内的 index, 即grid里面的global idx.
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    // grid 向上取整后可能包含多余 thread, 用边界检查避免越界访问.
     if (idx < n){
+        // 每个 thread 计算一个元素的平方
         out[idx] = in[idx] * in[idx];
     }
 }
@@ -76,12 +81,16 @@ float run_default_stream(float* h_in, float* h_out, int n){
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
+    // 单 stream baseline: start -> H2D -> kernel -> D2H -> stop 按序执行.
+    // event 区间不包含上面的 allocation, 也不包含后面的 resource cleanup.
     cudaEventRecord(start);
 
     // copy input to device, run kernel, copy result back
     cudaMemcpy(d_in, h_in, bytes, cudaMemcpyHostToDevice);
+    // grid (=65536) * BLOCK (=256) = N, 正好覆盖N个元素
     int grid = (n + BLOCK - 1) / BLOCK;
     square_kernel<<<grid, BLOCK>>>(d_in, d_out, n);
+    // 此处使用同步 D2H copy, 返回后 CPU 才能读取 h_out 中的结果.
     cudaMemcpy(h_out, d_out, bytes, cudaMemcpyDeviceToHost);
 
     cudaEventRecord(stop);
@@ -102,7 +111,15 @@ float run_default_stream(float* h_in, float* h_out, int n){
 // Run the same workload split across 4 streams so that H2D memcopies,
 // kernel execution, and D2H memcopies can overlap on the device.
 // Returns elapsed time in milliseconds.
+// 把数据分为 4 份,
+// 每份在自己的 stream 内依次执行 H2D -> kernel -> D2H; 跨 stream 有机会重叠.
+// 本版使用 cudaStreamNonBlocking, 不适用旧笔记中依赖 legacy 默认 stream
+// 隐式同步的计时解释, 也不能沿用旧版的 16M 元素, 512 threads 等数字.
+// 补充上方旧笔记: 当前 N 仍是 16M, 但每个 block 是 256 threads.
+// 不同 stream 只提供 overlap 机会; 实际效果取决于 copy engine 和 SM 等资源.
 float run_multi_stream(float* h_in, float* h_out, int n){
+    // 默认每份 16777216/4=4194304 个元素, 即 16 MiB; 当前实现要求 n 能被 NUM_STREAMS 整除.
+    // 若修改 n 后存在 remainder, 下面的等分方式不会处理末尾剩余元素.
     int chunk = n/NUM_STREAMS;                      // number of elements per stream
     size_t chunk_bytes = chunk * sizeof(float);
 
@@ -111,7 +128,10 @@ float run_multi_stream(float* h_in, float* h_out, int n){
 
     // allocate and initialize an array of stream handles
     for(int i = 0; i < NUM_STREAMS; i++){
+        // NonBlocking 表示不参与 legacy default stream 的隐式同步.
+        // 它不保证所有 API 对 CPU 都不阻塞, 也不保证多个 kernel 同时执行.
         cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking);
+        // dev mem也开4组, 每组都有自己的stream
         cudaMalloc(&d_in[i], chunk_bytes);
         cudaMalloc(&d_out[i], chunk_bytes);
     }
@@ -121,11 +141,13 @@ float run_multi_stream(float* h_in, float* h_out, int n){
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
+    // start 只进入 streams[0]; 其他 stream 没有显式等待此 event.
     cudaEventRecord(start, streams[0]);
 
     // asynchronously launch 4 copies + kernels + copies, each in its own
     // stream so they can overlap on the device
     for(int i = 0; i < NUM_STREAMS; i++){
+        // 各 stream 使用独立的 device buffer, 并访问互不重叠的 host chunk.
         int offset = i * chunk; // element offset into the host arrays for this stream
 
         // H2D: copy this stream's chunk to device (non-blocking on host)
@@ -138,8 +160,12 @@ float run_multi_stream(float* h_in, float* h_out, int n){
         );
 
         // kernel: will only start after the H2D copy in this stream completes
+        // grid = 16384, 为原grid的1/4, 正好覆盖1/4个原array长度
         int grid = (chunk + BLOCK - 1) / BLOCK;
+        // 第三个 launch 参数为 dynamic shared memory 大小, 第四个指定 stream.
+        // kernel 只看到当前 chunk, 因此传入 chunk 而不是整个 array 的 n.
         square_kernel<<<grid, BLOCK, 0, streams[i]>>>(
+            // d_in / d_out都已经是原array的1/4了.
             d_in[i], d_out[i], chunk
         );
 
@@ -153,10 +179,14 @@ float run_multi_stream(float* h_in, float* h_out, int n){
         );
     }
 
+    // 此处由 CPU 显式等待每个 stream, 之后才记录 stop; streams[0] 是数组第一项,
+    // 并非 CUDA 默认 stream 0. 不要把它理解成默认 stream 自动等待其他 streams.
     // Wait for all streams to complete their work
     for(int i=0; i < NUM_STREAMS; i++) { 
        cudaStreamSynchronize(streams[i]);
      }
+    // CPU 已等待所有 stream 完成, 再提交 stop; 区间可能包含 host 提交延迟和 GPU idle.
+    // 这个测量不是单个 kernel 的耗时, 也没有为所有 stream 建立共同的 start barrier.
     cudaEventRecord(stop, streams[0]);
 
     // Sync with stream 0, which only completes once all other work
@@ -197,6 +227,7 @@ int main(){
     // allocate pinned host memory: the OS normally moves RAM pages around freely,
     // pinning locks these pages in place so the GPU can read them directly
     // without the data being moved away mid-transfer
+    // cudaMallocHost 提供 pinned host memory, 使这里的 async H2D/D2H copy 可以与 CPU 工作重叠.
     float *h_in  = 0; // pointer to input data in host memory
     float *h_out = 0; // pointer to output data in host memory
     cudaMallocHost(&h_in, bytes);
@@ -212,10 +243,12 @@ int main(){
 
     //////////////////////////////////////////////////////////////////////
     // time execution with 4 streams
+    // 复用相同输入, 将 multi-stream 结果写回 h_out; 当前 sample 没有逐元素验证结果.
     float t2 = run_multi_stream(h_in, h_out, N);
 
     printf("Single stream = %.3f ms\n", t1);
     printf("Multi-stream  = %.3f ms\n", t2);
+    // 比值大于 1 才表示本次 multi-stream 更快; 单次测量和 Debug build 不代表稳定性能.
     printf("Speedup       = %.2fx\n",   t1 / t2);
 
     // release pinned host memory

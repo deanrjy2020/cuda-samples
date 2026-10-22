@@ -1,0 +1,86 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "cuda (WSL Debug)",
+      // 使用 NVIDIA Nsight 的 CUDA 调试适配器, 支持 CPU 和 GPU kernel 调试.
+      "type": "cuda-gdb",
+      "request": "launch",
+      //"program": "${workspaceFolder}/cpp/0_Introduction/vectorAdd/build/vectorAdd",
+      "program": "${workspaceFolder}/cpp/${input:cudaChapter}/${input:cudaSample}/build/${input:cudaSample}",
+      "args": [],
+      "stopAtEntry": true,
+      //"cwd": "${workspaceFolder}/cpp/0_Introduction/vectorAdd",
+      "cwd": "${workspaceFolder}/cpp/${input:cudaChapter}/${input:cudaSample}",
+      "environment": [],
+      "debuggerPath": "/usr/local/cuda/bin/cuda-gdb",
+      // 每次 kernel 启动时自动在 kernel 入口暂停, 不需要手动打断点.
+      //"breakOnLaunch": true
+    },
+    {
+      "name": "cuda (MSVC Debug)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      //"program": "${workspaceFolder}/cpp/1_Utilities/deviceQuery/build/deviceQuery.exe",
+      "program": "${workspaceFolder}/cpp/0_Introduction/vectorAdd/build/vectorAdd.exe",
+      "args": [],
+      "stopAtEntry": true,
+      //"cwd": "${workspaceFolder}/cpp/1_Utilities/deviceQuery",
+      "cwd": "${workspaceFolder}/cpp/0_Introduction/vectorAdd",
+      "environment": [],
+      "console": "integratedTerminal"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "cudaChapter",
+      "type": "pickString",
+      "description": "选择 CUDA 示例章节",
+      "options": [
+        "0_Introduction",
+        "1_Utilities"
+      ],
+      "default": "0_Introduction"
+    },
+    {
+      "id": "cudaSample",
+      "type": "pickString",
+      "description": "选择已有 run.sh 的 sample (请匹配章节并先 build)",
+      "options": [
+        {
+          "label": "0_Introduction/asyncAPI",
+          "value": "asyncAPI"
+        },
+        {
+          "label": "0_Introduction/matrixMul",
+          "value": "matrixMul"
+        },
+        {
+          "label": "0_Introduction/simpleAssert",
+          "value": "simpleAssert"
+        },
+        {
+          "label": "0_Introduction/simplePrintf",
+          "value": "simplePrintf"
+        },
+        {
+          "label": "0_Introduction/simpleStreams",
+          "value": "simpleStreams"
+        },
+        {
+          "label": "0_Introduction/simpleZeroCopy",
+          "value": "simpleZeroCopy"
+        },
+        {
+          "label": "0_Introduction/vectorAdd",
+          "value": "vectorAdd"
+        },
+        {
+          "label": "1_Utilities/deviceQuery",
+          "value": "deviceQuery"
+        }
+      ],
+      "default": "simpleAssert"
+    }
+  ]
+}

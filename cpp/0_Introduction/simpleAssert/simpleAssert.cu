@@ -40,14 +40,19 @@ bool testResult = true;
 // Each thread computes its global index and asserts it is below N. Threads with
 // gtid >= N trip the assertion, which aborts the kernel and surfaces on the host
 // as cudaErrorAssert at the next synchronization point.
+// 本例故意触发设备端断言, 演示 CPU 如何检测 GPU 执行错误.
+// assert 需要保持启用: 若编译时定义了 NDEBUG, 断言检查会被移除.
 __global__ void simpleAssertKernel(int N)
 {
+    // 一维全局线程编号 = 线程块编号 * 每块线程数 + 块内线程编号.
     int gtid = blockIdx.x * blockDim.x + threadIdx.x;
+    // 条件为假时报告设备端断言失败; 它不是让越界线程安全跳过的 if 判断.
     assert(gtid < N);
 }
 
 int main(int argc, char **argv)
 {
+    // 启动 2 个 block, 每个 block 32 个线程, 共 64 个线程, 编号为 0~63.
     int         Nblocks  = 2;
     int         Nthreads = 32;
     cudaError_t error;
@@ -56,9 +61,11 @@ int main(int argc, char **argv)
 
     // Select device 0 as the active GPU
     int devID = 0;
+    // 选择当前主机线程后续 CUDA 操作使用的 GPU, 设备编号从 0 开始.
     cudaSetDevice(devID);
 
     // Query compute capability (major.minor) and number of SMs on the device
+    // major.minor 是计算能力版本; smCount 是 GPU 的流式多处理器数量.
     int major = 0, minor = 0, smCount = 0;
     cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, devID);
     cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, devID);
@@ -69,14 +76,20 @@ int main(int argc, char **argv)
 
     // Kernel configuration, where a one-dimensional
     // grid and one-dimensional blocks are configured.
+    // 本例故意触发设备端 assert; 观察下面同步调用返回的错误.
+    // dim3 未指定的 y, z 维度默认为 1, 此处grid和block为一维.
     dim3 dimGrid(Nblocks);
     dim3 dimBlock(Nthreads);
 
     printf("Launch kernel to generate assertion failures\n");
+    // 传入 N=60, 编号 60~63 的四个线程不满足断言条件, 故意制造失败.
+    // 核函数启动相对 CPU 是异步的, 需要在后面的同步点检查执行结果.
     simpleAssertKernel<<<dimGrid, dimBlock>>>(60);
 
     // Synchronize (flushes assert output).
     printf("\n-- Begin assert output\n\n");
+    // 等待设备执行并取得错误状态, 同时刷新设备端断言输出.
+    // 多线程并行执行, 断言消息的打印顺序不保证按线程编号排列.
     error = cudaDeviceSynchronize();
     printf("\n-- End assert output\n\n");
 
@@ -87,8 +100,11 @@ int main(int argc, char **argv)
                cudaGetErrorString(error));
     }
 
+    // 本例的成功标准是捕获预期的 cudaErrorAssert, 而不是核函数正常完成.
+    // 因此看到断言失败后再输出 OK, 表示示例验证通过.
     testResult = error == cudaErrorAssert;
 
     printf("%s completed, returned %s\n", sampleName, testResult ? "OK" : "ERROR!");
+    // 设备端断言失败后不能直接继续正常使用该 CUDA 上下文; 本例验证后退出.
     exit(testResult ? EXIT_SUCCESS : EXIT_FAILURE);
 }

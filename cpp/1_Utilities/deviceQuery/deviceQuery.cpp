@@ -69,6 +69,7 @@ int main(int argc, char **argv)
     pArgv = argv;
 
     printf("%s Starting...\n\n", argv[0]);
+    printf(" CUDA Device Query App version: cuda-samples v13.4\n");
     printf(" CUDA Device Query (Runtime API) version (CUDART static linking)\n\n");
 
     int         deviceCount = 0;
@@ -98,6 +99,8 @@ int main(int argc, char **argv)
         printf("\nDevice %d: \"%s\"\n", dev, deviceProp.name);
 
         // Console log
+        // Driver Version 表示驱动支持的 CUDA 版本, Runtime Version 表示当前运行时版本.
+        // 版本整数按 major * 1000 + minor * 10 编码; 计算能力则描述 GPU 架构能力.
         cudaDriverGetVersion(&driverVersion);
         cudaRuntimeGetVersion(&runtimeVersion);
         printf("  CUDA Driver Version / Runtime Version          %d.%d / %d.%d\n",
@@ -107,6 +110,8 @@ int main(int argc, char **argv)
                (runtimeVersion % 100) / 10);
         printf("  CUDA Capability Major/Minor version number:    %d.%d\n", deviceProp.major, deviceProp.minor);
 
+        // 学习笔记(迁自 LearnCudaSamples): global memory 是 GPU 可用的全局内存.
+        // 独显通常对应板载显存; 旧 Xavier 平台则与 CPU 共享物理 DRAM.
         char msg[256];
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
         sprintf_s(msg,
@@ -125,6 +130,8 @@ int main(int argc, char **argv)
 #endif
         printf("%s", msg);
 
+        // Multiprocessors 指 SM(Streaming Multiprocessors), 不是 CUDA core 数.
+        // 每个 SM 的 core 数由 helper 中的架构映射表推算, 并非运行时直接查询值.
         printf("  (%03d) Multiprocessors, (%03d) CUDA Cores/MP:    %d CUDA Cores\n",
                deviceProp.multiProcessorCount,
                _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor),
@@ -184,12 +191,20 @@ int main(int argc, char **argv)
                deviceProp.maxTexture2DLayered[1],
                deviceProp.maxTexture2DLayered[2]);
 
+        // shared memory 和寄存器既有单个 block 的上限, 也有整个 SM 的资源预算.
+        // 同一 SM 上驻留的多个 block 共享这些资源, 因此资源用量会限制 occupancy.
         printf("  Total amount of constant memory:               %zu bytes\n", deviceProp.totalConstMem);
         printf("  Total amount of shared memory per block:       %zu bytes\n", deviceProp.sharedMemPerBlock);
         printf("  Total shared memory per multiprocessor:        %zu bytes\n", deviceProp.sharedMemPerMultiprocessor);
         printf("  Total number of registers available per block: %d\n", deviceProp.regsPerBlock);
+        // 寄存器数量以 32-bit 寄存器为单位, 不是字节数.
+        printf("  Total number of registers available per sm:    %d\n", deviceProp.regsPerMultiprocessor);
+        // Warp 是线程执行的基本分组; 下面的 SM 上限描述同时驻留的线程和 block 数.
         printf("  Warp size:                                     %d\n", deviceProp.warpSize);
         printf("  Maximum number of threads per multiprocessor:  %d\n", deviceProp.maxThreadsPerMultiProcessor);
+        printf("  Maximum number of blocks per multiprocessor:   %d\n", deviceProp.maxBlocksPerMultiProcessor);
+        // block 的 x*y*z 还必须不超过 maxThreadsPerBlock, 不能只检查各维度上限.
+        // grid 维度限制一次 launch 的规模, 不代表所有 block 能同时驻留在 GPU 上.
         printf("  Maximum number of threads per block:           %d\n", deviceProp.maxThreadsPerBlock);
         printf("  Max dimension size of a thread block (x,y,z): (%d, %d, %d)\n",
                deviceProp.maxThreadsDim[0],
@@ -218,6 +233,7 @@ int main(int argc, char **argv)
         printf("  CUDA Device Driver Mode (TCC or WDDM):         %s\n",
                deviceProp.tccDriver ? "TCC (Tesla Compute Cluster Driver)" : "WDDM (Windows Display Driver Model)");
 #endif
+        // UVA 统一主机和设备的虚拟地址空间; Managed Memory 另外提供托管内存能力.
         printf("  Device supports Unified Addressing (UVA):      %s\n", deviceProp.unifiedAddressing ? "Yes" : "No");
         printf("  Device supports Managed Memory:                %s\n", deviceProp.managedMemory ? "Yes" : "No");
         printf("  Device supports Compute Preemption:            %s\n",
@@ -250,8 +266,10 @@ int main(int argc, char **argv)
     }
 
     // If there are 2 or more GPUs, query to determine whether RDMA is supported
+    // 多 GPU 时查询有方向的 P2P 访问能力; 这里只查询, 不启用 peer access.
     if (deviceCount >= 2) {
         cudaDeviceProp prop[64];
+        // 保存通过下方初筛的 GPU 编号, 再逐对查询实际 P2P 能力.
         int            gpuid[64]; // we want to find the first two GPUs that can support P2P
         int            gpu_p2p_count = 0;
 
